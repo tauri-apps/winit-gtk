@@ -362,10 +362,6 @@ impl UnownedWindow {
         self.xwindow.lock().unwrap()
     }
 
-    fn is_x11_backend(&self) -> bool {
-        matches!(self.display_handle, OwnedDisplayHandle::Xlib { .. })
-    }
-
     fn is_wayland_backend(&self) -> bool {
         matches!(self.display_handle, OwnedDisplayHandle::Wayland { .. })
     }
