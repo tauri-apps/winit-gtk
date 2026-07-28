@@ -17,7 +17,7 @@ use winit_core::monitor::{Fullscreen, MonitorHandle};
 use winit_core::window::{
     CursorGrabMode, ImeCapabilities, ImeRequest, ImeRequestError, ResizeDirection, Theme,
     UserAttentionType, Window as CoreWindow, WindowAttributes, WindowButtons, WindowId,
-    WindowLevel,
+    WindowLevel, WindowType,
 };
 
 use crate::cursor::{GtkCustomCursor, invisible_cursor};
@@ -182,6 +182,10 @@ impl UnownedWindow {
             .take()
             .and_then(|attrs| attrs.cast::<crate::WindowAttributesGtk4>().ok())
             .unwrap_or_default();
+
+        if attributes.window_type == WindowType::Popup {
+            return Err(NotSupportedError::new("popup windows are not supported by GTK4").into());
+        }
 
         // Clone the app out of `SharedState` before `present()`, which can
         // synchronously realize the widget and re-enter callbacks that mutate it.
@@ -1027,6 +1031,10 @@ impl Drop for Window {
 }
 
 impl CoreWindow for Window {
+    fn window_type(&self) -> WindowType {
+        WindowType::Window
+    }
+
     fn id(&self) -> WindowId {
         self.window_id
     }
