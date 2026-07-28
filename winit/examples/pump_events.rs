@@ -8,6 +8,7 @@
     wayland_platform,
     gtk4_platform,
     android_platform,
+    orbital_platform,
 ))]
 fn main() -> std::process::ExitCode {
     use std::process::ExitCode;
@@ -88,7 +89,7 @@ fn main() -> std::process::ExitCode {
     }
 }
 
-#[cfg(any(ios_platform, web_platform, orbital_platform))]
+#[cfg(any(ios_platform, web_platform))]
 fn main() {
     panic!("This platform doesn't support pump_events.")
 }
