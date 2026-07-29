@@ -89,7 +89,7 @@ jobs:
           - toolchain: '1.86'
             platform: { name: 'Redox OS' }
           # The gtk-rs 0.22 stack used by the GTK4 backend requires rustc 1.92.
-          - toolchain: '1.85'
+          - toolchain: '1.86'
             platform: { name: 'GTK4' }
         include:
           - toolchain: '1.86'

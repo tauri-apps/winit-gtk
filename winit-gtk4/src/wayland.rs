@@ -10,7 +10,7 @@ use wayland_protocols::wp::pointer_constraints::zv1::client::zwp_locked_pointer_
 use wayland_protocols::wp::pointer_constraints::zv1::client::zwp_pointer_constraints_v1::{
     Lifetime, ZwpPointerConstraintsV1,
 };
-use winit_core::error::{NotSupportedError, OsError, RequestError};
+use winit_core::error::{NotSupportedError, RequestError};
 use winit_core::window::CursorGrabMode;
 
 use crate::event_loop::OwnedDisplayHandle;
@@ -117,12 +117,11 @@ impl GtkWaylandCursorGrab {
             return Err(NotSupportedError::new("Wayland connection is not available").into());
         };
         let conn = Connection::from_backend(backend);
-        let (globals, queue) = registry_queue_init::<WaylandCursorGrabState>(&conn)
-            .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))?;
+        let (globals, queue) =
+            registry_queue_init::<WaylandCursorGrabState>(&conn).map_err(|err| os_error!(err))?;
 
-        let pointer_constraints = globals
-            .bind(&queue.handle(), 1..=1, ())
-            .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))?;
+        let pointer_constraints =
+            globals.bind(&queue.handle(), 1..=1, ()).map_err(|err| os_error!(err))?;
 
         Ok(Some(Self {
             conn,
@@ -239,7 +238,7 @@ impl GtkWaylandCursorGrab {
     }
 
     fn flush(&self) -> Result<(), RequestError> {
-        self.conn.flush().map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))
+        self.conn.flush().map_err(|err| os_error!(err).into())
     }
 }
 
