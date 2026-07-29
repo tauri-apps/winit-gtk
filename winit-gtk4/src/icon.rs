@@ -1,6 +1,5 @@
-use gtk4::gdk;
-use gtk4::glib;
 use gtk4::prelude::*;
+use gtk4::{gdk, glib};
 use winit_core::icon::{Icon, RgbaIcon};
 
 pub trait PlatformIconExt {

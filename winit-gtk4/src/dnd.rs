@@ -1,22 +1,19 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::fmt;
 use std::future::Future;
-use std::io;
 use std::ops::{BitOr, ControlFlow};
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::{Arc, Weak};
+use std::{fmt, io};
 
 use dpi::{LogicalPosition, PhysicalPosition};
-use gtk4::gdk;
-use gtk4::gio;
-use gtk4::glib;
 use gtk4::glib::prelude::StaticType;
 use gtk4::glib::value::ToValue;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
+use gtk4::{gdk, gio, glib};
 use winit_core::data_transfer::{
     DataTransfer, DataTransferId, DataTransferSend, SendData, TransferType, TypeHint, TypedData,
 };
@@ -245,7 +242,8 @@ pub(crate) fn connect_ingoing_drag(
             let id = match drag_state.transfer_id() {
                 Some(id) => id,
                 None => {
-                    // The enter event hasn't had a chance to fire yet, so we need to create the transfer here.
+                    // The enter event hasn't had a chance to fire yet, so we need to create the
+                    // transfer here.
                     let source_actions = target
                         .current_drop()
                         .map(|drop| drop.actions())
