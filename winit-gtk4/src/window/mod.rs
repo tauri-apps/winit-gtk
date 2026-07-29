@@ -11,7 +11,8 @@ use gtk4::prelude::*;
 use winit_core::cursor::{Cursor, CursorIcon};
 use winit_core::error::{NotSupportedError, RequestError};
 use winit_core::event::WindowEvent;
-use winit_core::icon::{Icon, RgbaIcon};
+use winit_core::event_loop::DragIcon;
+use winit_core::icon::Icon;
 use winit_core::keyboard::{ModifiersState, PhysicalKey};
 use winit_core::monitor::{Fullscreen, MonitorHandle};
 use winit_core::window::{
@@ -22,9 +23,9 @@ use winit_core::window::{
 
 use crate::cursor::{GtkCustomCursor, invisible_cursor};
 use crate::event_loop::{ActiveEventLoop, OwnedDisplayHandle, SharedState};
+use crate::icon::PlatformIconExt;
 use crate::sink::CommandSink;
 
-mod dnd;
 mod keyboards;
 mod pointers;
 mod touches;
@@ -325,7 +326,7 @@ impl UnownedWindow {
         let window_handle = raw_window_handle(&window.gtk_window);
         *window.window_handle.lock().unwrap() = window_handle;
 
-        window.set_window_icon(window_icon.as_ref().and_then(|icon| icon.cast_ref()));
+        window.set_window_icon(window_icon.as_ref());
         window.set_transparent(attributes.transparent);
         if fullscreen.is_some() {
             window.set_fullscreen(fullscreen.as_ref());
@@ -340,6 +341,10 @@ impl UnownedWindow {
 
     pub(crate) fn id(&self) -> WindowId {
         self.window_id
+    }
+
+    pub(crate) fn scale_factor(&self) -> f64 {
+        self.state.lock().unwrap().scale_factor
     }
 
     pub(crate) fn take_redraw_requested(&self) -> bool {
@@ -385,7 +390,7 @@ impl UnownedWindow {
         Self::connect_fullscreen(gtk_window, window.clone());
         Self::connect_decorated(gtk_window, window.clone());
         Self::connect_theme(event_loop, gtk_window, window.clone());
-        dnd::connect(event_loop, gtk_window, window.clone());
+        crate::dnd::connect_ingoing_drag(event_loop, gtk_window, window.clone());
         keyboards::connect(event_loop, gtk_window, window.clone());
         pointers::connect(event_loop, gtk_window, window.clone());
         touches::connect(event_loop, gtk_window, window);
@@ -796,7 +801,7 @@ impl UnownedWindow {
         });
     }
 
-    fn set_window_icon(&self, icon: Option<&RgbaIcon>) {
+    fn set_window_icon(&self, icon: Option<&Icon>) {
         let Some(surface) = self.gtk_window.surface() else {
             return;
         };
@@ -804,7 +809,7 @@ impl UnownedWindow {
             return;
         };
 
-        if let Some(texture) = icon.map(gdk_texture_from_icon) {
+        if let Some(texture) = icon.and_then(|icon| icon.texture()) {
             toplevel.set_icon_list(&[texture]);
         } else {
             toplevel.set_icon_list(&[]);
@@ -900,6 +905,41 @@ impl UnownedWindow {
         if let Some(surface) = self.gtk_window.surface() {
             surface.queue_render();
         }
+    }
+
+    pub(crate) fn start_drag(
+        &self,
+        content: &impl IsA<gtk4::gdk::ContentProvider>,
+        actions: gtk4::gdk::DragAction,
+        icon: Option<DragIcon>,
+    ) -> Result<gtk4::gdk::Drag, RequestError> {
+        let Some(surface) = self.gtk_window.surface() else {
+            return Err(NotSupportedError::new("drag-and-drop requires a GDK surface").into());
+        };
+
+        let (device, press) = {
+            let Some(device) = self.pointer_device.lock().unwrap().clone() else {
+                let e = NotSupportedError::new("drag-and-drop requires a pointer device");
+                return Err(e.into());
+            };
+            let Some(press) = self.pointer_button_press.lock().unwrap().clone() else {
+                let e = NotSupportedError::new("drag-and-drop requires a pointer button press");
+                return Err(e.into());
+            };
+
+            (device, press.button_press)
+        };
+
+        let drag = gtk4::gdk::Drag::begin(&surface, &device, content, actions, press.x, press.y)
+            .ok_or(RequestError::Ignored)?;
+
+        if let Some(icon) = icon {
+            if let Some(texture) = icon.icon.texture() {
+                gtk4::DragIcon::set_from_paintable(&drag, &texture, -icon.offset_x, -icon.offset_y);
+            }
+        }
+
+        Ok(drag)
     }
 
     fn drag_window(&self) -> Result<(), RequestError> {
@@ -1440,7 +1480,7 @@ impl WindowCommand {
                 }
             },
             WindowCommand::SetWindowIcon(icon) => {
-                window.set_window_icon(icon.as_ref().and_then(|icon| icon.cast_ref()));
+                window.set_window_icon(icon.as_ref());
             },
             WindowCommand::SetCursor(cursor) => {
                 if window.state.lock().unwrap().cursor_visible {
@@ -1524,19 +1564,6 @@ fn resize_direction_to_gdk_edge(direction: ResizeDirection) -> gtk4::gdk::Surfac
         ResizeDirection::SouthWest => gtk4::gdk::SurfaceEdge::SouthWest,
         ResizeDirection::West => gtk4::gdk::SurfaceEdge::West,
     }
-}
-
-fn gdk_texture_from_icon(icon: &RgbaIcon) -> gtk4::gdk::Texture {
-    let bytes = gtk4::glib::Bytes::from_owned(icon.buffer().to_vec());
-    let stride = icon.width() as usize * 4;
-    gtk4::gdk::MemoryTexture::new(
-        icon.width() as i32,
-        icon.height() as i32,
-        gtk4::gdk::MemoryFormat::R8g8b8a8,
-        &bytes,
-        stride,
-    )
-    .upcast()
 }
 
 fn guessed_monitor() -> Option<gtk4::gdk::Monitor> {

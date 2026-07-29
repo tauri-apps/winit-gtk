@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use dpi::{PhysicalPosition, PhysicalSize};
 use gtk4::prelude::*;
-use winit_core::error::{NotSupportedError, OsError, RequestError};
+use winit_core::error::{NotSupportedError, RequestError};
 use winit_core::window::{CursorGrabMode, WindowLevel};
 use winit_x11::x11_util;
 use x11_util::{AtomName, StateOperation};
@@ -107,10 +107,8 @@ impl GtkXWindow {
         self.xconn
             .xcb_connection()
             .warp_pointer(x11rb::NONE, self.xid, 0, 0, 0, 0, x, y)
-            .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))?;
-        self.xconn
-            .flush_requests()
-            .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))?;
+            .map_err(|err| os_error!(err))?;
+        self.xconn.flush_requests().map_err(|err| os_error!(err))?;
 
         Ok(())
     }
@@ -126,13 +124,12 @@ impl GtkXWindow {
         self.xconn
             .xcb_connection()
             .ungrab_pointer(x11rb::CURRENT_TIME)
-            .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))?;
+            .map_err(|err| os_error!(err))?;
 
         let result = match mode {
-            CursorGrabMode::None => self
-                .xconn
-                .flush_requests()
-                .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err))),
+            CursorGrabMode::None => {
+                self.xconn.flush_requests().map_err(|err| os_error!(err).into())
+            },
             CursorGrabMode::Confined => {
                 let result = self
                     .xconn
@@ -158,9 +155,9 @@ impl GtkXWindow {
                         0u32,
                         x11rb::CURRENT_TIME,
                     )
-                    .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))?
+                    .map_err(|err| os_error!(err))?
                     .reply()
-                    .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))?;
+                    .map_err(|err| os_error!(err))?;
 
                 match result.status {
                     xproto::GrabStatus::SUCCESS => Ok(()),
@@ -177,14 +174,12 @@ impl GtkXWindow {
                         Err("Cursor could not be confined: frozen by another client")
                     },
                     status => {
-                        return Err(RequestError::Os(OsError::new(
-                            line!(),
-                            file!(),
-                            format!("cursor could not be confined: unexpected status {status:?}"),
-                        )));
+                        let err =
+                            format!("cursor could not be confined: unexpected status {status:?}");
+                        return Err(os_error!(err).into());
                     },
                 }
-                .map_err(|err| RequestError::Os(OsError::new(line!(), file!(), err)))
+                .map_err(|err| os_error!(err).into())
             },
             CursorGrabMode::Locked => return Ok(()),
         };

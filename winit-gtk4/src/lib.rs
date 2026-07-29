@@ -1,18 +1,24 @@
 //! Winit's GTK4 backend.
 
-mod cursor;
-mod event_loop;
-mod monitor;
-mod sink;
-mod wayland;
-mod window;
-mod x11;
-
 use winit_core::event_loop::ActiveEventLoop as CoreActiveEventLoop;
 use winit_core::window::{PlatformWindowAttributes, Window as CoreWindow};
 
 pub use self::event_loop::{ActiveEventLoop, EventLoop, PlatformSpecificEventLoopAttributes};
 pub use self::window::Window;
+
+macro_rules! os_error {
+    ($error:expr $(,)?) => {{ winit_core::error::OsError::new(line!(), file!(), $error) }};
+}
+
+mod cursor;
+mod dnd;
+mod event_loop;
+mod icon;
+mod monitor;
+mod sink;
+mod wayland;
+mod window;
+mod x11;
 
 /// Additional methods on [`ActiveEventLoop`] that are specific to GTK4.
 pub trait ActiveEventLoopExtGtk4 {

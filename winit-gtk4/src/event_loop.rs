@@ -12,12 +12,15 @@ use dpi::PhysicalSize;
 use gtk4::prelude::*;
 use winit_core::application::ApplicationHandler;
 use winit_core::cursor::{CustomCursor as CoreCustomCursor, CustomCursorSource};
-use winit_core::error::{EventLoopError, NotSupportedError, OsError, RequestError};
+use winit_core::data_transfer::{
+    DataTransfer, DataTransferId, DataTransferSend, TransferType, TypedData,
+};
+use winit_core::error::{EventLoopError, NotSupportedError, RequestError};
 use winit_core::event::{StartCause, SurfaceSizeWriter, WindowEvent};
 use winit_core::event_loop::pump_events::PumpStatus;
 use winit_core::event_loop::{
-    ActiveEventLoop as CoreActiveEventLoop, ControlFlow, DeviceEvents,
-    EventLoopProxy as CoreEventLoopProxy, EventLoopProxyProvider,
+    ActiveEventLoop as CoreActiveEventLoop, AsyncRequestSerial, ControlFlow, DeviceEvents,
+    DndAction, DragIcon, EventLoopProxy as CoreEventLoopProxy, EventLoopProxyProvider,
     OwnedDisplayHandle as CoreOwnedDisplayHandle,
 };
 use winit_core::monitor::MonitorHandle;
@@ -39,6 +42,7 @@ pub(crate) struct SharedState {
     pub(crate) commands: Arc<Mutex<CommandSink>>,
     pub(crate) events_sink: EventSink,
     pub(crate) windows: HashMap<WindowId, Weak<UnownedWindow>>,
+    pub(crate) dnd: crate::dnd::DndState,
 }
 
 #[derive(Debug)]
@@ -156,18 +160,18 @@ impl EventLoop {
             gtk4::gio::ApplicationFlags::NON_UNIQUE
         };
 
-        gtk4::init().map_err(|err| EventLoopError::Os(OsError::new(line!(), file!(), err)))?;
+        gtk4::init().map_err(|err| os_error!(err))?;
 
         let app = gtk4::Application::new(application_id, flags);
         app.connect_activate(|_| {});
-        app.register(None::<&gtk4::gio::Cancellable>)
-            .map_err(|err| EventLoopError::Os(OsError::new(line!(), file!(), err)))?;
+        app.register(None::<&gtk4::gio::Cancellable>).map_err(|err| os_error!(err))?;
 
         let shared = Rc::new(RefCell::new(SharedState {
             app,
             commands: Arc::new(Mutex::new(CommandSink::new())),
             events_sink: EventSink::new(),
             windows: HashMap::new(),
+            dnd: crate::dnd::DndState::default(),
         }));
         let context = gtk4::glib::MainContext::default();
 
@@ -572,7 +576,124 @@ impl CoreActiveEventLoop for ActiveEventLoop {
     fn rwh_06_handle(&self) -> &dyn rwh_06::HasDisplayHandle {
         self
     }
+
+    fn fetch_data_transfer(
+        &self,
+        id: DataTransferId,
+        type_: &dyn TransferType,
+    ) -> Result<AsyncRequestSerial, RequestError> {
+        let transfer = {
+            let shared = self.shared.borrow();
+            let Some(current_drag) = shared.dnd.receive_drag() else {
+                return Err(RequestError::Ignored);
+            };
+
+            if current_drag.transfer_id() != id {
+                return Err(RequestError::Ignored);
+            }
+
+            current_drag.clone()
+        };
+
+        let typed_data = transfer
+            .typed_data(type_)
+            .map(|data| Arc::new(data) as Arc<dyn TypedData>)
+            .ok_or(RequestError::Ignored)?;
+
+        let serial = AsyncRequestSerial::get();
+
+        let event = WindowEvent::DataTransferReceived { id, serial, value: typed_data.clone() };
+        self.shared.borrow_mut().events_sink.push_window_event(event, transfer.window_id());
+        self.context.wakeup();
+
+        Ok(serial)
+    }
+
+    fn data_transfer(&self, id: DataTransferId) -> Result<Box<dyn DataTransfer>, RequestError> {
+        let transfer = {
+            let shared = self.shared.borrow();
+            let Some(current_drag) = shared.dnd.receive_drag() else {
+                return Err(RequestError::Ignored);
+            };
+
+            if current_drag.transfer_id() != id {
+                return Err(RequestError::Ignored);
+            }
+
+            current_drag.clone()
+        };
+
+        Ok(Box::new(transfer))
+    }
+
+    fn set_valid_dnd_actions(
+        &self,
+        id: DataTransferId,
+        actions: &[DndAction],
+    ) -> Result<(), RequestError> {
+        let mut shared = self.shared.borrow_mut();
+        let Some(current_drag) = shared.dnd.receive_drag_mut() else {
+            return Err(os_error!(UnknownDataTransfer(id)).into());
+        };
+
+        if current_drag.transfer_id() != id {
+            return Err(os_error!(UnknownDataTransfer(id)).into());
+        }
+
+        current_drag.set_actions(actions);
+
+        Ok(())
+    }
+
+    fn start_drag(
+        &self,
+        source: WindowId,
+        send_data: Box<dyn DataTransferSend>,
+        actions: &[DndAction],
+        icon: Option<DragIcon>,
+    ) -> Result<DataTransferId, RequestError> {
+        let gdk_actions = crate::dnd::dnd_actions_to_gdk(actions);
+        if gdk_actions.is_empty() {
+            let e = NotSupportedError::new("start_drag called with no GTK-supported DnD actions");
+            return Err(e.into());
+        }
+
+        let provider = crate::dnd::create_content_provider(send_data).ok_or_else(|| {
+            NotSupportedError::new("start_drag called with no GTK-advertisable data types")
+        })?;
+
+        let window = self
+            .shared
+            .borrow()
+            .windows
+            .get(&source)
+            .and_then(Weak::upgrade)
+            .ok_or(os_error!("Tried to initiate drag, but source window ID was invalid"))?;
+
+        let drag = window.start_drag(&provider, gdk_actions, icon)?;
+        let id = self.shared.borrow_mut().dnd.next_data_transfer_id();
+
+        let drag_source = crate::dnd::DragSource::new(id, drag.clone(), provider);
+        self.shared.borrow_mut().dnd.set_send_drag(drag_source);
+
+        crate::dnd::connect_outgoing_drag(self, &drag, id, source);
+
+        Ok(id)
+    }
 }
+
+/// An operation was attempted on a data transfer ID, but that ID was invalid.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct UnknownDataTransfer(pub DataTransferId);
+
+impl fmt::Display for UnknownDataTransfer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let id = self.0.into_raw();
+        write!(f, "Unknown data transfer with ID {id}")
+    }
+}
+
+impl std::error::Error for UnknownDataTransfer {}
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum OwnedDisplayHandle {
@@ -585,13 +706,8 @@ unsafe impl Sync for OwnedDisplayHandle {}
 
 impl OwnedDisplayHandle {
     fn new() -> Result<Self, EventLoopError> {
-        raw_display_handle().map_err(|err| {
-            EventLoopError::Os(OsError::new(
-                line!(),
-                file!(),
-                format!("failed to get GTK display handle: {err}"),
-            ))
-        })
+        raw_display_handle()
+            .map_err(|err| os_error!(format!("failed to get GTK display handle: {err}")).into())
     }
 }
 
