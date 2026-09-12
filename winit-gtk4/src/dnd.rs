@@ -538,6 +538,7 @@ pub(crate) fn dnd_action_winit_to_gdk(action: DndAction) -> gdk::DragAction {
         DndAction::Link => gdk::DragAction::LINK,
         DndAction::Ask => gdk::DragAction::ASK,
         DndAction::Private => gdk::DragAction::empty(),
+        _ => gdk::DragAction::empty(),
     }
 }
 
@@ -813,7 +814,7 @@ mod send_provider {
         let uris = match data {
             SendData::Uris(uris) => uris,
             SendData::String(uri) => vec![uri],
-            SendData::Bytes(_) => {
+            _ => {
                 return Err(io_error(gio::IOErrorEnum::InvalidData, "URI list data was bytes"));
             },
         };
@@ -828,9 +829,7 @@ mod send_provider {
             SendData::Uris(uris) => Ok(String::from_utf8(encode_uri_list(uris))
                 .map_err(|_| io_error(gio::IOErrorEnum::InvalidData, "URI list was not UTF-8"))?
                 .to_value()),
-            SendData::Bytes(_) => {
-                Err(io_error(gio::IOErrorEnum::InvalidData, "string data was bytes"))
-            },
+            _ => Err(io_error(gio::IOErrorEnum::InvalidData, "string data was bytes")),
         }
     }
 
@@ -842,6 +841,7 @@ mod send_provider {
                 Ok(string.into_bytes())
             },
             SendData::Bytes(bytes) => Ok(bytes),
+            _ => Err(io_error(gio::IOErrorEnum::NotSupported, "unsupported data kind")),
         }
     }
 

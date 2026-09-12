@@ -826,6 +826,7 @@ impl UnownedWindow {
                 }
             },
             Some(Fullscreen::Borderless(None)) => self.gtk_window.fullscreen(),
+            Some(_) => self.gtk_window.fullscreen(),
             None => self.gtk_window.unfullscreen(),
         }
     }

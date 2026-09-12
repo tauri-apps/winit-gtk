@@ -135,6 +135,7 @@ fn touch_begin(
         WindowEvent::PointerButton {
             device_id,
             primary,
+            is_macos_activation_click: false,
             state: ElementState::Pressed,
             position,
             button: ButtonSource::Touch { finger_id, force },
@@ -191,6 +192,7 @@ fn touch_end(
         WindowEvent::PointerButton {
             device_id,
             primary,
+            is_macos_activation_click: false,
             state: ElementState::Released,
             position: touch_point.position,
             button: ButtonSource::Touch { finger_id: touch_point.finger_id, force },
