@@ -14,6 +14,7 @@ mod cursor;
 mod dnd;
 mod event_loop;
 mod icon;
+mod keysym;
 mod monitor;
 mod sink;
 mod wayland;
