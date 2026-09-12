@@ -1,14 +1,18 @@
 [package]
 categories = ["gui"]
 description = "Cross-platform window creation library."
-documentation = "https://docs.rs/winit"
+documentation = "https://docs.rs/tauri-winit"
 edition.workspace = true
 keywords = ["windowing"]
 license.workspace = true
-name = "winit"
+name = "tauri-winit"
 repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
+
+# Published as `tauri-winit` but used as `winit`.
+[lib]
+name = "winit"
 
 [package.metadata.docs.rs]
 features = [

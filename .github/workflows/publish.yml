@@ -1,0 +1,53 @@
+name: Publish
+
+# Publishes the crates that carry this fork's changes to crates.io under the `tauri-` prefix:
+#
+#   tauri-winit-x11  -> winit-x11
+#   tauri-winit-gtk4 -> winit-gtk4 (depends on tauri-winit-x11)
+#   tauri-winit      -> winit      (depends on both)
+#
+# Every other workspace crate is unmodified and resolves to the upstream `winit-*` release pinned
+# in the root `Cargo.toml`, so it is not published from here.
+#
+# `cargo publish` with multiple `--package` flags (cargo >= 1.90) publishes them in dependency
+# order and waits for each one to be available in the index before publishing the next.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Only verify the packages (`cargo publish --dry-run`), do not upload
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: taiki-e/checkout-action@v1
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Needed to verify `tauri-winit-gtk4` (`cargo publish` builds each package before uploading).
+      - name: Install GTK4 dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev
+
+      - name: Publish
+        run: >
+          cargo publish
+          --package tauri-winit-x11
+          --package tauri-winit-gtk4
+          --package tauri-winit
+          ${{ inputs.dry-run && '--dry-run' || '' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.ORG_CRATES_IO_TOKEN }}

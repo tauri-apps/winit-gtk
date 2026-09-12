@@ -67,7 +67,7 @@ jobs:
           - { name: 'X11',                target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: '--no-default-features --features=x11' }
           - { name: 'Wayland',            target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: '--no-default-features --features=wayland,wayland-dlopen' }
           - { name: 'GTK4',               target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: '--no-default-features --features=gtk4', gtk4: true }
-          - { name: 'Android',            target: aarch64-linux-android,    os: ubuntu-latest, options: '--package winit --features=android-native-activity', cmd: 'apk -- ' }
+          - { name: 'Android',            target: aarch64-linux-android,    os: ubuntu-latest, options: '--package tauri-winit --features=android-native-activity', cmd: 'apk -- ' }
           - { name: 'Redox OS',           target: x86_64-unknown-redox,     os: ubuntu-latest,   }
           - { name: 'macOS x86_64',       target: x86_64-apple-darwin,      os: macos-latest,    }
           - { name: 'macOS Aarch64',      target: aarch64-apple-darwin,     os: macos-latest,    }
@@ -93,7 +93,7 @@ jobs:
             platform: { name: 'GTK4' }
         include:
           - toolchain: '1.86'
-            platform: { name: 'Android', target: aarch64-linux-android, os: ubuntu-latest, options: '--package winit --features=android-native-activity', cmd: 'apk -- ' }
+            platform: { name: 'Android', target: aarch64-linux-android, os: ubuntu-latest, options: '--package tauri-winit --features=android-native-activity', cmd: 'apk -- ' }
           - toolchain: 'nightly'
             platform: { name: 'Web', target: wasm32-unknown-unknown, os: ubuntu-latest, test-options: -Zdoctest-xcompile }
           - toolchain: 'nightly'
@@ -228,7 +228,7 @@ jobs:
 
     - name: Test winit X11
       if: contains(matrix.platform.target, 'linux-gnu')
-      run: cargo $CMD test -p winit-x11 --target=${{ matrix.platform.target }}
+      run: cargo $CMD test -p tauri-winit-x11 --target=${{ matrix.platform.target }}
 
     - name: Test winit Wayland
       if: contains(matrix.platform.target, 'linux-gnu')
@@ -236,7 +236,7 @@ jobs:
 
     - name: Test winit GTK4
       if: matrix.platform.gtk4 == true
-      run: cargo $CMD test -p winit-gtk4 --target=${{ matrix.platform.target }}
+      run: cargo $CMD test -p tauri-winit-gtk4 --target=${{ matrix.platform.target }}
 
     # Test only on Linux x86_64, so we avoid spending unnecessary CI hours.
     - name: Test dpi crate

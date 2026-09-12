@@ -1,12 +1,16 @@
 [package]
 description = "Winit's GTK4 backend"
-documentation = "https://docs.rs/winit-gtk4"
+documentation = "https://docs.rs/tauri-winit-gtk4"
 edition.workspace = true
 license.workspace = true
-name = "winit-gtk4"
+name = "tauri-winit-gtk4"
 repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
+
+# Published as `tauri-winit-gtk4` but used as `winit_gtk4`.
+[lib]
+name = "winit_gtk4"
 
 [dependencies]
 dpi.workspace = true

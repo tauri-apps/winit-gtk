@@ -1,12 +1,16 @@
 [package]
 description = "Winit's X11 backend"
-documentation = "https://docs.rs/winit-x11"
+documentation = "https://docs.rs/tauri-winit-x11"
 edition.workspace = true
 license.workspace = true
-name = "winit-x11"
+name = "tauri-winit-x11"
 repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
+
+# Published as `tauri-winit-x11` but used as `winit_x11`.
+[lib]
+name = "winit_x11"
 
 [features]
 serde = ["dep:serde", "bitflags/serde", "smol_str/serde", "dpi/serde"]
