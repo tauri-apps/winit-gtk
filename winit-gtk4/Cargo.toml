@@ -20,10 +20,11 @@ gtk4.workspace = true
 rwh_06.workspace = true
 wayland-client.workspace = true
 wayland-protocols.workspace = true
-winit-common = { workspace = true, features = ["xkb"] }
+winit-common = { workspace = true, features = ["xkb", "x11"] }
 winit-core.workspace = true
 winit-x11.workspace = true
 x11rb.workspace = true
+xkbcommon-dl.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

@@ -140,7 +140,7 @@ fn key_event(
     let logical = logical_key(keyval);
     let text = key_text(keyval, state);
     let key_without_modifiers = key_without_modifiers(controller, keyval, keycode);
-    let location = winit_common::xkb::keysym_location(keyval.into_glib());
+    let location = crate::keysym::keysym_location(keyval.into_glib());
 
     WindowEvent::KeyboardInput {
         // Match X11/Wayland: focused window keyboard input is not tied to a Winit device id.
@@ -239,7 +239,7 @@ fn is_non_repeating_named_key(key: Key) -> bool {
 
 fn logical_key(keyval: gtk4::gdk::Key) -> Key {
     let keysym = keyval.into_glib();
-    let key = winit_common::xkb::keysym_to_key(keysym);
+    let key = crate::keysym::keysym_to_key(keysym);
     if !matches!(key, Key::Unidentified(_)) {
         key
     } else if let Some(ch) = keyval.to_unicode() {

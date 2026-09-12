@@ -335,6 +335,7 @@ fn pointer_button_event(event: &gtk4::gdk::Event, window: &UnownedWindow) -> Opt
     Some(WindowEvent::PointerButton {
         device_id: device_id(&device),
         primary: true,
+        is_macos_activation_click: false,
         state,
         position,
         button: mouse_button(button_event.button())?,

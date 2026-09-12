@@ -17,9 +17,7 @@ impl GtkCustomCursor {
     pub(crate) fn new(source: CustomCursorSource) -> Result<Self, RequestError> {
         let image = match source {
             CustomCursorSource::Image(image) => image,
-            CustomCursorSource::Animation { .. } | CustomCursorSource::Url { .. } => {
-                return Err(NotSupportedError::new("unsupported cursor kind").into());
-            },
+            _ => return Err(NotSupportedError::new("unsupported cursor kind").into()),
         };
 
         let texture = texture_from_image(&image);
